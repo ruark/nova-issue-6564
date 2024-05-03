@@ -1,0 +1,41 @@
+version: "3.7"
+
+x-php-common:
+  &php-common
+  build:
+    context: ./php-fpm
+    args:
+      - WWW_DATA_UID=$WWW_DATA_UID
+      - WWW_DATA_GID=$WWW_DATA_GID
+
+services:
+  nginx:
+    build:
+      context: ./nginx
+    pull_policy: build
+    volumes:
+      - ../public:/var/www/app/public
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    depends_on:
+      - "php-fpm"
+
+  php-fpm:
+    <<: *php-common
+    user: "${WWW_DATA_UID}:${WWW_DATA_GID}"
+    volumes:
+      - ../:/var/www/app
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:5-alpine
+
+  php-queue-worker:
+    <<: *php-common
+    volumes:
+      - ../:/var/www/app
+    working_dir: /var/www/app
+    entrypoint: php artisan queue:work --queue=high,default,low
+    depends_on:
+      - redis
